@@ -22,5 +22,5 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Fork from https://github.com/pmav/game-of-life
 
-[Unreleased]: https://github.com/urlandi/game-of-live/compare/v3.2.0...HEAD
-[3.2.0]: https://github.com/urlandi/game-of-live/compare/v3.2.0...v3.1.1
+[Unreleased]: https://github.com/urlandi/game-of-life/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/urlandi/game-of-life/compare/v3.2.0...v3.1.1
