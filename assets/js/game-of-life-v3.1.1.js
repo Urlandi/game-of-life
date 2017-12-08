@@ -32,6 +32,9 @@
     running : false,
     autoplay : false,
 
+    //Surface opened/closed
+    surface : false,
+
 
     // Clear state
     clear : {
@@ -175,6 +178,9 @@
       this.autoplay = this.helpers.getUrlParameter('autoplay') === '1' ? true : this.autoplay;
       this.trail.current = this.helpers.getUrlParameter('trail') === '1' ? true : this.trail.current;
 
+      //Initial surface
+      this.surface = this.helpers.getUrlParameter('surface') === '1' ? true : this.surface;
+
       // Initial color config
       colors = parseInt(this.helpers.getUrlParameter('colors'), 10);
       if (isNaN(colors) || colors < 1 || colors > GOL.colors.schemes.length) {
@@ -304,6 +310,7 @@
       this.helpers.registerEvent(document.getElementById('buttonTrail'), 'click', this.handlers.buttons.trail, false);
       this.helpers.registerEvent(document.getElementById('buttonGrid'), 'click', this.handlers.buttons.grid, false);
       this.helpers.registerEvent(document.getElementById('buttonColors'), 'click', this.handlers.buttons.colors, false);
+      this.helpers.registerEvent(document.getElementById('buttonSurface'), 'click', this.handlers.buttons.surface, false);
     },
 
 
@@ -509,6 +516,13 @@
           }
         },
 
+        /**
+         * Button for open/close surface
+         */
+        surface : function() {
+          GOL.element.messages.layout.innerHTML = GOL.surface ? 'Closed universe' : 'Open space';
+          GOL.surface = !GOL.surface;
+        },
 
         /**
          *
@@ -559,6 +573,7 @@
             url = (window.location.href.indexOf('?') === -1) ? window.location.href : window.location.href.slice(0, window.location.href.indexOf('?'));
 
             params = '?autoplay=0' +
+            '&surface=' + (GOL.surface ? '1' : '0') +
             '&trail=' + (GOL.trail.current ? '1' : '0') +
             '&grid=' + (GOL.grid.current + 1) +
             '&colors=' + (GOL.colors.current + 1) +
@@ -812,7 +827,30 @@
             y = this.actualState[i][0];
 
             // Possible dead neighbours
-            deadNeighbours = [[x-1, y-1, 1], [x, y-1, 1], [x+1, y-1, 1], [x-1, y, 1], [x+1, y, 1], [x-1, y+1, 1], [x, y+1, 1], [x+1, y+1, 1]];
+            var nordPoint = y-1;
+            var southPoint = y+1;
+            var westPoint = x-1;
+            var eastPoint = x+1;
+
+            if (GOL.surface) {
+                if (nordPoint < 0) {
+                    nordPoint=GOL.rows-1;
+                }
+
+                if (southPoint >= GOL.rows) {
+                    southPoint=0;
+                }
+
+                if (westPoint < 0) {
+                    westPoint=GOL.columns-1;
+                }
+
+                if (eastPoint >= GOL.columns) {
+                    eastPoint=0;
+                }
+             }
+
+            deadNeighbours = [[westPoint, nordPoint, 1], [x, nordPoint, 1], [eastPoint, nordPoint, 1], [westPoint, y, 1], [eastPoint, y, 1], [westPoint, southPoint, 1], [x, southPoint, 1], [eastPoint, southPoint, 1]];
 
             // Get number of live neighbours and remove alive neighbours from deadNeighbours
             neighbours = this.getNeighboursFromAlive(x, y, i, deadNeighbours);
@@ -869,38 +907,68 @@
       getNeighboursFromAlive : function (x, y, i, possibleNeighboursList) {
         var neighbours = 0, k;
 
+         var westPoint = x-1;
+         var eastPoint = x+1;
+
+         if (GOL.surface) {
+             if (westPoint < 0) {
+                 westPoint=GOL.columns-1;
+             }
+         
+             if (eastPoint >= GOL.columns) {
+                 eastPoint=0;
+             }
+        }
+
         // Top
-        if (this.actualState[i-1] !== undefined) {
-          if (this.actualState[i-1][0] === (y - 1)) {
-            for (k = this.topPointer; k < this.actualState[i-1].length; k++) {
+        var numPrevLine = i-1;
+        var prevLine = this.actualState[numPrevLine];
+        if (GOL.surface && numPrevLine < 0) {
+            prevLine = this.actualState[this.actualState.length-1];
+        }
 
-              if (this.actualState[i-1][k] >= (x-1) ) {
+        if (prevLine !== undefined) {
 
-                if (this.actualState[i-1][k] === (x - 1)) {
+          var numUpLine = y-1;
+          if (GOL.surface && numUpLine < 0) {
+               numUpLine = GOL.rows-1;
+          }
+
+          if (prevLine[0] === numUpLine) {
+
+            var startTopPointer = this.topPointer;
+            if (GOL.surface) {
+                startTopPointer=1;
+            }
+
+            for (k = startTopPointer; k < prevLine.length; k++) {              
+
+            if (prevLine[k] >= westPoint || GOL.surface) {
+                if (prevLine[k] === westPoint) {
                   possibleNeighboursList[0] = undefined;
-                  this.topPointer = k + 1;
+                  this.topPointer = k+1;
                   neighbours++;
                 }
 
-                if (this.actualState[i-1][k] === x) {
+                if (prevLine[k] === x) {
                   possibleNeighboursList[1] = undefined;
                   this.topPointer = k;
                   neighbours++;
                 }
 
-                if (this.actualState[i-1][k] === (x + 1)) {
+                if (prevLine[k] === eastPoint) {
                   possibleNeighboursList[2] = undefined;
 
                   if (k == 1) {
                     this.topPointer = 1;
                   } else {
-                    this.topPointer = k - 1;
+                    this.topPointer = k-1;
                   }
 
                   neighbours++;
                 }
 
-                if (this.actualState[i-1][k] > (x + 1)) {
+                if (!GOL.surface && prevLine[k] > eastPoint) {
                   break;
                 }
               }
@@ -909,56 +977,76 @@
         }
 
         // Middle
-        for (k = 1; k < this.actualState[i].length; k++) {
-          if (this.actualState[i][k] >= (x - 1)) {
-
-            if (this.actualState[i][k] === (x - 1)) {
+        var middleLine=this.actualState[i];        
+        
+        for (k = 1; k < middleLine.length; k++) {
+          if (middleLine[k] >= westPoint || GOL.surface) {            
+            if (middleLine[k] === westPoint) {
               possibleNeighboursList[3] = undefined;
               neighbours++;
             }
 
-            if (this.actualState[i][k] === (x + 1)) {
+            if (middleLine[k] === eastPoint) {
               possibleNeighboursList[4] = undefined;
               neighbours++;
             }
 
-            if (this.actualState[i][k] > (x + 1)) {
+            if (!GOL.surface && middleLine[k] > eastPoint) {
               break;
             }
           }
         }
 
         // Bottom
-        if (this.actualState[i+1] !== undefined) {
-          if (this.actualState[i+1][0] === (y + 1)) {
-            for (k = this.bottomPointer; k < this.actualState[i+1].length; k++) {
-              if (this.actualState[i+1][k] >= (x - 1)) {
 
-                if (this.actualState[i+1][k] === (x - 1)) {
+        var numNextLine = i+1;
+        var nextLine = this.actualState[numNextLine];
+        if (GOL.surface && numNextLine >= this.actualState.length) {
+            nextLine = this.actualState[0];
+        }
+
+        if (nextLine !== undefined) {
+
+          var numDownLine = y+1;
+          if (GOL.surface && numDownLine >= GOL.rows) {
+               numDownLine = 0;
+          }
+
+          if (nextLine[0] === numDownLine) {
+
+            var startBottomPointer = this.bottomPointer;
+            if (GOL.surface) {
+                startBottomPointer=1;
+            }
+
+            for (k = startBottomPointer; k < nextLine.length; k++) {
+
+              if (nextLine[k] >= westPoint || GOL.surface) {
+                if (nextLine[k] === westPoint) {
                   possibleNeighboursList[5] = undefined;
-                  this.bottomPointer = k + 1;
+                  this.bottomPointer = k+1;
                   neighbours++;
                 }
 
-                if (this.actualState[i+1][k] === x) {
+                if (nextLine[k] === x) {
                   possibleNeighboursList[6] = undefined;
                   this.bottomPointer = k;
                   neighbours++;
                 }
 
-                if (this.actualState[i+1][k] === (x + 1)) {
+                if (nextLine[k] === eastPoint) {
                   possibleNeighboursList[7] = undefined;
 
                   if (k == 1) {
                     this.bottomPointer = 1;
                   } else {
-                    this.bottomPointer = k - 1;
+                    this.bottomPointer = k-1;
                   }
 
                   neighbours++;
                 }
 
-                if (this.actualState[i+1][k] > (x + 1)) {
+                if (!GOL.surface && nextLine[k] > eastPoint) {
                   break;
                 }
               }
